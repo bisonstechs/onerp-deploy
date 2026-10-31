@@ -22,7 +22,7 @@ RUN curl -fsSL -o /tmp/wkhtml.deb \
     && rm -f /tmp/wkhtml.deb && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -ms /bin/bash frappe \
-    && pip install --no-cache-dir "frappe-bench==5.22.9" \
+    && pip install --no-cache-dir "click==8.1.7" "frappe-bench==5.22.9" \
     && mkdir -p /home/frappe && chown -R frappe:frappe /home/frappe
 
 USER frappe

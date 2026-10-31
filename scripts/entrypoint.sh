@@ -45,7 +45,7 @@ if [ ! -d "sites/${SITE_NAME}" ]; then
     --install-app erpnext
   )
   if [ -n "$DB_NAME" ]; then
-    NEW_SITE_ARGS+=(--db-name "$DB_NAME")
+    NEW_SITE_ARGS+=(--db-name "$DB_NAME" --force)
   fi
   bench new-site "${NEW_SITE_ARGS[@]}"
   bench --site "$SITE_NAME" set-config allow_cors "*"
@@ -53,6 +53,16 @@ if [ ! -d "sites/${SITE_NAME}" ]; then
 fi
 
 bench use "$SITE_NAME"
+bench set-config -g default_site "$SITE_NAME"
+
+# Railway domain (aur koi extra domain) ko same site pe point karo,
+# taake Host header se site mil jaye.
+for DOMAIN in "${RAILWAY_PUBLIC_DOMAIN:-}" ${EXTRA_DOMAINS:-}; do
+  if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "$SITE_NAME" ] && [ ! -e "sites/${DOMAIN}" ]; then
+    echo "[onerp] linking domain ${DOMAIN} -> ${SITE_NAME}"
+    ln -s "$SITE_NAME" "sites/${DOMAIN}"
+  fi
+done
 
 ROLE="${1:-web}"
 case "$ROLE" in

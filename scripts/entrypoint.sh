@@ -10,7 +10,6 @@ PORT="${PORT:-${LISTEN_PORT:-8000}}"
 DB_HOST="${MYSQLHOST:-${DB_HOST:-}}"
 DB_PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
 DB_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQLPASSWORD:-}}"
-DB_NAME="${MYSQLDATABASE:-${MYSQL_DATABASE:-}}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 REDIS_CACHE="${REDIS_CACHE:-}"
 REDIS_QUEUE="${REDIS_QUEUE:-}"
@@ -26,7 +25,7 @@ if [ -z "$REDIS_QUEUE" ] && [ -n "${REDIS_URL:-}" ]; then
   fi
 fi
 
-echo "[onerp] waiting for MySQL at ${DB_HOST}:${DB_PORT}..."
+echo "[onerp] waiting for MariaDB at ${DB_HOST}:${DB_PORT}..."
 wait-for-it "${DB_HOST}:${DB_PORT}" -t 120
 
 bench set-config -g db_host "$DB_HOST"
@@ -35,32 +34,32 @@ bench set-config -g redis_cache "$REDIS_CACHE"
 bench set-config -g redis_queue "$REDIS_QUEUE"
 bench set-config -g redis_socketio "$REDIS_CACHE"
 
-if [ ! -d "sites/${SITE_NAME}" ]; then
-  echo "[onerp] creating site ${SITE_NAME}..."
-  NEW_SITE_ARGS=(
-    "$SITE_NAME"
-    --mariadb-root-password "$DB_ROOT_PASSWORD"
-    --admin-password "$ADMIN_PASSWORD"
-    --no-mariadb-socket
-    --install-app erpnext
-  )
-  if [ -n "$DB_NAME" ]; then
-    NEW_SITE_ARGS+=(--db-name "$DB_NAME" --force)
+MARKER="sites/${SITE_NAME}/.onerp_installed"
+
+if [ ! -f "$MARKER" ]; then
+  # purani adhoori site ho to saaf karo
+  if [ -d "sites/${SITE_NAME}" ]; then
+    echo "[onerp] removing incomplete site ${SITE_NAME}..."
+    rm -rf "sites/${SITE_NAME}"
   fi
-  bench new-site "${NEW_SITE_ARGS[@]}"
+  echo "[onerp] creating site ${SITE_NAME}..."
+  bench new-site "$SITE_NAME" \
+    --mariadb-root-password "$DB_ROOT_PASSWORD" \
+    --admin-password "$ADMIN_PASSWORD" \
+    --mariadb-user-host-login-scope='%' \
+    --install-app erpnext
   bench --site "$SITE_NAME" set-config allow_cors "*"
   bench --site "$SITE_NAME" enable-scheduler || true
+  touch "$MARKER"
 fi
 
 bench use "$SITE_NAME"
 bench set-config -g default_site "$SITE_NAME"
 
-# Railway domain (aur koi extra domain) ko same site pe point karo,
-# taake Host header se site mil jaye.
 for DOMAIN in "${RAILWAY_PUBLIC_DOMAIN:-}" ${EXTRA_DOMAINS:-}; do
-  if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "$SITE_NAME" ] && [ ! -e "sites/${DOMAIN}" ]; then
+  if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "$SITE_NAME" ]; then
     echo "[onerp] linking domain ${DOMAIN} -> ${SITE_NAME}"
-    ln -s "$SITE_NAME" "sites/${DOMAIN}"
+    ln -sfn "$SITE_NAME" "sites/${DOMAIN}"
   fi
 done
 

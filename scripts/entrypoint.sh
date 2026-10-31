@@ -6,6 +6,7 @@ cd /home/frappe/frappe-bench
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
 
 SITE_NAME="${SITE_NAME:-frontend}"
+export SITE_NAME
 PORT="${PORT:-${LISTEN_PORT:-8000}}"
 DB_HOST="${MYSQLHOST:-${DB_HOST:-}}"
 DB_PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
@@ -37,7 +38,6 @@ bench set-config -g redis_socketio "$REDIS_CACHE"
 MARKER="sites/${SITE_NAME}/.onerp_installed"
 
 if [ ! -f "$MARKER" ]; then
-  # purani adhoori site ho to saaf karo
   if [ -d "sites/${SITE_NAME}" ]; then
     echo "[onerp] removing incomplete site ${SITE_NAME}..."
     rm -rf "sites/${SITE_NAME}"
@@ -63,17 +63,37 @@ for DOMAIN in "${RAILWAY_PUBLIC_DOMAIN:-}" ${EXTRA_DOMAINS:-}; do
   fi
 done
 
+# gunicorn ke andar /assets aur /files serve karne ka wrapper
+cat > /home/frappe/frappe-bench/onerp_wsgi.py <<'PYEOF'
+import os
+from werkzeug.middleware.shared_data import SharedDataMiddleware
+from frappe.app import application as frappe_app
+
+SITES = "/home/frappe/frappe-bench/sites"
+SITE = os.environ.get("SITE_NAME", "frontend")
+
+application = SharedDataMiddleware(
+    frappe_app,
+    {
+        "/assets": os.path.join(SITES, "assets"),
+        "/files": os.path.join(SITES, SITE, "public", "files"),
+    },
+    cache=True,
+)
+PYEOF
+
 ROLE="${1:-web}"
 case "$ROLE" in
   web)
     echo "[onerp] starting gunicorn on :${PORT}"
     exec /home/frappe/frappe-bench/env/bin/gunicorn \
       --chdir=/home/frappe/frappe-bench/sites \
+      --pythonpath=/home/frappe/frappe-bench \
       --bind=0.0.0.0:"${PORT}" \
       --workers="${WEB_WORKERS:-2}" \
       --threads="${WEB_THREADS:-4}" \
       --timeout=120 \
-      frappe.app:application
+      onerp_wsgi:application
     ;;
   worker)
     exec bench worker --queue short,default,long

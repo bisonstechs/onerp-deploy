@@ -14,6 +14,7 @@ DB_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQLPASSWORD:-}}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 REDIS_CACHE="${REDIS_CACHE:-}"
 REDIS_QUEUE="${REDIS_QUEUE:-}"
+PERSIST="${PERSIST_DIR:-/home/frappe/persist}"
 
 if [ -z "$REDIS_CACHE" ] && [ -n "${REDIS_URL:-}" ]; then
   REDIS_CACHE="$REDIS_URL"
@@ -35,22 +36,38 @@ bench set-config -g redis_cache "$REDIS_CACHE"
 bench set-config -g redis_queue "$REDIS_QUEUE"
 bench set-config -g redis_socketio "$REDIS_CACHE"
 
-MARKER="sites/${SITE_NAME}/.onerp_installed"
+if ! mkdir -p "$PERSIST" 2>/dev/null || [ ! -w "$PERSIST" ]; then
+  echo "[onerp] ERROR: ${PERSIST} writable nahi hai. Volume lagao ya RAILWAY_RUN_UID=0 variable set karo."
+  exit 1
+fi
 
-if [ ! -f "$MARKER" ]; then
-  if [ -d "sites/${SITE_NAME}" ]; then
-    echo "[onerp] removing incomplete site ${SITE_NAME}..."
-    rm -rf "sites/${SITE_NAME}"
+MARKER="${PERSIST}/${SITE_NAME}/.onerp_installed"
+
+if [ -f "$MARKER" ]; then
+  echo "[onerp] existing site mila, link kar raha hoon..."
+  rm -rf "sites/${SITE_NAME}"
+  ln -sfn "${PERSIST}/${SITE_NAME}" "sites/${SITE_NAME}"
+else
+  rm -rf "sites/${SITE_NAME}" "${PERSIST:?}/${SITE_NAME}"
+  FORCE_ARGS=()
+  if [ "${ONERP_FORCE_RECREATE:-}" = "1" ]; then
+    echo "[onerp] ONERP_FORCE_RECREATE=1, purana database drop hoga"
+    FORCE_ARGS+=(--force)
   fi
   echo "[onerp] creating site ${SITE_NAME}..."
   bench new-site "$SITE_NAME" \
     --mariadb-root-password "$DB_ROOT_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --mariadb-user-host-login-scope='%' \
-    --install-app erpnext
+    --install-app erpnext \
+    ${FORCE_ARGS[@]+"${FORCE_ARGS[@]}"}
   bench --site "$SITE_NAME" set-config allow_cors "*"
   bench --site "$SITE_NAME" enable-scheduler || true
+  # site ko volume pe move karo taake redeploy pe bachi rahe
+  mv "sites/${SITE_NAME}" "${PERSIST}/${SITE_NAME}"
+  ln -sfn "${PERSIST}/${SITE_NAME}" "sites/${SITE_NAME}"
   touch "$MARKER"
+  echo "[onerp] install complete"
 fi
 
 bench use "$SITE_NAME"

@@ -63,6 +63,10 @@ else
     ${FORCE_ARGS[@]+"${FORCE_ARGS[@]}"}
   bench --site "$SITE_NAME" set-config allow_cors "*"
   bench --site "$SITE_NAME" enable-scheduler || true
+  # stock Website Settings ship with signup disabled; Onerp tenants register their company here
+  bench --site "$SITE_NAME" execute frappe.client.set_value \
+    --kwargs "{'doctype':'Website Settings','name':'Website Settings','fieldname':{'disable_signup':0}}" \
+    >/dev/null || echo "[onerp] WARNING: signup enable nahi hua -- Website Settings me 'Disable Signup' khud uncheck karo"
   # site ko volume pe move karo taake redeploy pe bachi rahe
   mv "sites/${SITE_NAME}" "${PERSIST}/${SITE_NAME}"
   ln -sfn "${PERSIST}/${SITE_NAME}" "sites/${SITE_NAME}"

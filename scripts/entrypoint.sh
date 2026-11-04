@@ -8,6 +8,7 @@ cd /home/frappe/frappe-bench
 SITE_NAME="${SITE_NAME:-frontend}"
 export SITE_NAME
 PORT="${PORT:-${LISTEN_PORT:-8000}}"
+ROLE="${1:-web}"
 DB_HOST="${MYSQLHOST:-${DB_HOST:-}}"
 DB_PORT="${MYSQLPORT:-${DB_PORT:-3306}}"
 DB_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQLPASSWORD:-}}"
@@ -63,15 +64,25 @@ else
     ${FORCE_ARGS[@]+"${FORCE_ARGS[@]}"}
   bench --site "$SITE_NAME" set-config allow_cors "*"
   bench --site "$SITE_NAME" enable-scheduler || true
-  # stock Website Settings ship with signup disabled; Onerp tenants register their company here
-  bench --site "$SITE_NAME" execute frappe.client.set_value \
-    --kwargs "{'doctype':'Website Settings','name':'Website Settings','fieldname':{'disable_signup':0}}" \
-    >/dev/null || echo "[onerp] WARNING: signup enable nahi hua -- Website Settings me 'Disable Signup' khud uncheck karo"
   # site ko volume pe move karo taake redeploy pe bachi rahe
   mv "sites/${SITE_NAME}" "${PERSIST}/${SITE_NAME}"
   ln -sfn "${PERSIST}/${SITE_NAME}" "sites/${SITE_NAME}"
   touch "$MARKER"
   echo "[onerp] install complete"
+fi
+
+# tenant store bhi volume pe, warna har redeploy pe tenants mit jaate hain
+bench --site "$SITE_NAME" set-config onerp_saas_db "${PERSIST}/onerp-data/onerp_saas.db"
+
+# Stock Website Settings signup disabled rakhti hai, jisse login page pe company
+# register karne ka button hi nahi aata. Flag sirf document me hai (koi conf fallback
+# nahi), isliye har web boot pe on karo -- installed sites ke liye bhi, sirf naye
+# site ke liye nahi.
+if [ "$ROLE" = "web" ]; then
+  echo "[onerp] enabling company registration on the login page..."
+  bench --site "$SITE_NAME" execute frappe.client.set_value \
+    --kwargs "{'doctype':'Website Settings','name':'Website Settings','fieldname':{'disable_signup':0}}" \
+    >/dev/null || echo "[onerp] WARNING: signup enable nahi hua -- Website Settings me 'Disable Signup' uncheck karo"
 fi
 
 bench use "$SITE_NAME"
@@ -103,7 +114,6 @@ application = SharedDataMiddleware(
 )
 PYEOF
 
-ROLE="${1:-web}"
 case "$ROLE" in
   web)
     echo "[onerp] starting gunicorn on :${PORT}"

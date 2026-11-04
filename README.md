@@ -29,10 +29,20 @@ commit when its own files change; Railway starts a build on that push.
 `erpnext.api.saas` keeps tenants and trials in SQLite, default
 `~/onerp-data/onerp_saas.db`. That path is container-local, so a redeploy wipes
 it and every account silently stops being a tenant (no trial banner, no
-per-tenant user scoping). Point it at the persisted volume instead:
+per-tenant user scoping). The entrypoint therefore writes the persisted path
+into site config on every boot:
 
 ```
-ONERP_SAAS_DB=/home/frappe/persist/onerp-data/onerp_saas.db
+onerp_saas_db = ${PERSIST_DIR:-/home/frappe/persist}/onerp-data/onerp_saas.db
 ```
 
-Any `ONERP_*` value can also be set as a `onerp_*` key in site config.
+A `ONERP_SAAS_DB` env var still overrides it, and any other `ONERP_*` value can
+also be set as a `onerp_*` key in site config.
+
+## Company registration
+
+Stock `Website Settings` ships with **Disable Signup** checked, which hides the
+Register tab on `/#login` — the tab that runs the Onerp company signup. There is
+no conf fallback for that flag, so the entrypoint clears the document on each
+web boot. Sites installed before this commit get fixed by the next deploy, no
+manual uncheck needed.

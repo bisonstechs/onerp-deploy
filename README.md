@@ -51,6 +51,17 @@ a page a company owner's roles cannot open, so a new tenant's first screen is
 flag is site-wide: the first registration after this ships also unblocks tenants that
 registered earlier.
 
+Third hole from the same skipped wizard: no `Fiscal Year` row exists (the wizard's
+`create_fiscal_year_and_company` is what normally makes one). Nothing fails until the
+tenant opens the Accounting workspace, whose *Profit and Loss* chart runs the P&L
+report with `from_fiscal_year = erpnext.utils.get_fiscal_year()`; with no fiscal year
+that raises `Start Year and End Year are mandatory` as a modal, and signup looks broken.
+`erpnext.api.auth.ensure_fiscal_years()` gives each company a fiscal year covering
+today, using the wizard's country calendar (Pakistan Jul–Jun, most others Jan–Dec) and
+scoping the row to that company so different calendars can coexist on one site. It runs
+from `register_company` and again on every web boot, so existing tenants are backfilled
+without re-registering.
+
 ## Tenant store
 
 `erpnext.api.saas` keeps tenants and trials in SQLite, default

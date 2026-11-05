@@ -83,6 +83,13 @@ if [ "$ROLE" = "web" ]; then
   bench --site "$SITE_NAME" execute frappe.client.set_value \
     --kwargs "{'doctype':'Website Settings','name':'Website Settings','fieldname':{'disable_signup':0}}" \
     >/dev/null || echo "[onerp] WARNING: signup enable nahi hua -- Website Settings me 'Disable Signup' uncheck karo"
+
+  # Setup Wizard na chalne ki wajah se site me koi Fiscal Year nahi hota, aur Accounting
+  # workspace ka Profit and Loss chart usi pe chalta hai -- tenants ko "Start Year and
+  # End Year are mandatory" ka modal aata tha. Boot pe har company ko FY de do.
+  echo "[onerp] ensuring a fiscal year for every company..."
+  bench --site "$SITE_NAME" execute erpnext.api.auth.ensure_fiscal_years \
+    || echo "[onerp] WARNING: fiscal year backfill skip ho gaya"
 fi
 
 bench use "$SITE_NAME"

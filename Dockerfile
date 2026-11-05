@@ -37,6 +37,13 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
 FROM base AS builder
 USER frappe
 WORKDIR /home/frappe
+
+# Docker caches the `bench init` layer below on apps.json alone, so pushes to either
+# fork would silently never ship. These two fetches run on every build and change
+# content when a fork's main moves, which busts that cache for exactly that reason.
+ADD https://github.com/arshad-dev57/onerp-frappe/commits/main.atom /tmp/onerp_frappe_head.atom
+ADD https://github.com/arshad-dev57/onerp-erpnext/commits/main.atom /tmp/onerp_erpnext_head.atom
+
 COPY --chown=frappe:frappe apps.json /opt/apps.json
 
 RUN . "$NVM_DIR/nvm.sh" \

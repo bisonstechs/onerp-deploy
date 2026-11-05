@@ -22,9 +22,16 @@ First Docker build can take 15–30+ minutes. Site is auto-created on first boot
 
 Every build clones both forks at `main`, so pushing there is what ships desk
 changes — the image rebuilds assets during `bench init`. This repo only needs a
-commit when its own files change; Railway starts a build on that push. Pushing
-to the forks alone does not wake Railway, so to ship app-only changes either
-Redeploy the `web` service in the dashboard or commit a docs change here.
+commit when its own files change; Railway starts a build on that push.
+
+The `bench init` layer that does the cloning is cached by Docker on `apps.json`
+alone, so a fork push on its own ships nothing and Railway finishes in under a
+minute. The two `ADD`s above that layer in the Dockerfile re-fetch each fork's
+`commits/main.atom` on every build, so the clone reruns whenever either `main`
+moves. A real app rebuild is the slow one — 15–30 minutes.
+
+Railway only builds on a push to *this* repo, so after pushing app changes, land
+any commit here (or press Redeploy in the dashboard) to start that rebuild.
 
 ## Base data on a fresh site
 

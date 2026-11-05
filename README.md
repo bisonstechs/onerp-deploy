@@ -22,7 +22,19 @@ First Docker build can take 15–30+ minutes. Site is auto-created on first boot
 
 Every build clones both forks at `main`, so pushing there is what ships desk
 changes — the image rebuilds assets during `bench init`. This repo only needs a
-commit when its own files change; Railway starts a build on that push.
+commit when its own files change; Railway starts a build on that push. Pushing
+to the forks alone does not wake Railway, so to ship app-only changes either
+Redeploy the `web` service in the dashboard or commit a docs change here.
+
+## Base data on a fresh site
+
+`bench new-site --install-app erpnext` installs the app but never runs the Setup
+Wizard, so ERPNext's base records (Warehouse Type `Transit`, UOMs, Item Groups,
+Territories, Address Templates) are absent and the first company insert dies with
+`Could not find Warehouse Type: Transit` — the "Goods In Transit" warehouse every
+new Company creates links to that row. `erpnext.api.auth.register_company`
+installs them once, guarded on that row, so the site's first registration seeds
+the data and the rest register normally.
 
 ## Tenant store
 

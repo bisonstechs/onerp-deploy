@@ -43,6 +43,14 @@ new Company creates links to that row. `erpnext.api.auth.register_company`
 installs them once, guarded on that row, so the site's first registration seeds
 the data and the rest register normally.
 
+The same skipped wizard leaves a second hole: `Installed Application.is_setup_complete`
+stays `0`, and while it is `0` the desk reroutes every `/app` visit to `setup-wizard` —
+a page a company owner's roles cannot open, so a new tenant's first screen is
+"Not permitted". Frappe only recomputes those flags during install/migrate, so
+`register_company` now marks them once a Company and a real System User exist. The
+flag is site-wide: the first registration after this ships also unblocks tenants that
+registered earlier.
+
 ## Tenant store
 
 `erpnext.api.saas` keeps tenants and trials in SQLite, default
